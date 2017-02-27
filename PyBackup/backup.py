@@ -1,21 +1,20 @@
 #!/usr/bin/env python
 import argparse
+import os
 from pybackup import PyBackup
 
 
 def main(args):
     action = args['action']
-    bucket = args['bucket']
-    directory = args['directory']
-    file_to_restore = args['restore']
-    s3_access_key = args['s3_access_key']
-    s3_secret_access_key = args['s3_secret_access_key']
-
-    pybackup = PyBackup(s3_access_key, s3_secret_access_key, bucket, directory, action)
+    if os.environ.get('s3_access_key') and not args['s3_access_key']:
+        args['s3_access_key'] = os.environ.get('s3_access_key')
+    if os.environ.get('s3_secret_access_key') and not args['s3_secret_access_key']:
+        args['s3_secret_access_key'] = os.environ.get('s3_secret_access_key')
+    pybackup = PyBackup(args['s3_access_key'], args['s3_secret_access_key'], args['bucket'], args['directory'])
     if action == 'backup':
         return pybackup.backup()
     elif action == 'restore':
-        return pybackup.restore(file_to_restore)
+        return pybackup.restore(args['restore'])
     elif action == 'cleanup':
         return pybackup.cleanup()
 
@@ -53,13 +52,13 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         '--s3-access-key',
-        required=True,
+        required=False,
         help='--s3-access-key: S3 Access Key',
         dest='s3_access_key',
     )
     parser.add_argument(
         '--s3-secret-access-key',
-        required=True,
+        required=False,
         help='--s3-secret-access-key: S3 Access Key',
         dest='s3_secret_access_key',
     )
