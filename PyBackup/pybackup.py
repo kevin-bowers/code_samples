@@ -7,9 +7,6 @@ import time
 import tinys3
 import urllib
 from functools import partial
-from requests.packages.urllib3.exceptions import InsecurePlatformWarning, SNIMissingWarning
-requests.packages.urllib3.disable_warnings(InsecurePlatformWarning)
-requests.packages.urllib3.disable_warnings(SNIMissingWarning)
 
 
 class PyBackup:
