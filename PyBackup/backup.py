@@ -6,23 +6,24 @@ from pybackup import PyBackup
 
 def main(args):
     action = args['action']
+
     if os.environ.get('s3_access_key') and not args['s3_access_key']:
         args['s3_access_key'] = os.environ.get('s3_access_key')
     if os.environ.get('s3_secret_access_key') and not args['s3_secret_access_key']:
         args['s3_secret_access_key'] = os.environ.get('s3_secret_access_key')
-    pybackup = PyBackup(args['s3_access_key'], args['s3_secret_access_key'], args['bucket'], args['directory'])
+
+    pybackup = PyBackup(args['s3_access_key'], args['s3_secret_access_key'], args['bucket'], args['directory'], args['verbose'])
+
     if action == 'backup':
         return pybackup.backup()
     elif action == 'restore':
         return pybackup.restore(args['restore'])
-    elif action == 'cleanup':
-        return pybackup.cleanup()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='A Backup Utility'
     )
-    available_actions = ['backup', 'cleanup', 'restore']
+    available_actions = ['backup', 'restore']
     parser.add_argument(
         '--action', '-a',
         required=True,
@@ -51,6 +52,13 @@ if __name__ == "__main__":
         dest='restore',
     )
     parser.add_argument(
+        '--verbose', '-v',
+        required=False,
+        help='Enable Verbose logging',
+        dest='verbose',
+        action='store_true'
+    )
+    parser.add_argument(
         '--s3-access-key',
         required=False,
         help='--s3-access-key: S3 Access Key',
@@ -64,4 +72,4 @@ if __name__ == "__main__":
     )
 
     args = vars(parser.parse_args())
-    print main(args)
+    print(main(args))

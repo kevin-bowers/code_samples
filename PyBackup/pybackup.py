@@ -6,10 +6,10 @@ import time
 import tinys3
 import urllib
 from functools import partial
-
+from requests.exceptions import HTTPError
 
 class PyBackup:
-    def __init__(self, s3_access_key, s3_secret_key, s3_bucket, backup_directory):
+    def __init__(self, s3_access_key, s3_secret_key, s3_bucket, backup_directory, verbose=True):
         self.s3_access_key = s3_access_key
         self.s3_secret_key = s3_secret_key
         self.bucket = s3_bucket
@@ -17,9 +17,14 @@ class PyBackup:
         self.restore_directory = backup_directory
         self.s3pool = tinys3.Pool(self.s3_access_key, self.s3_secret_key, tls=True, size=10)
         self.c, self.conn = self.db_connect()
+        self.verbose = verbose
+
+    def _log(self, message):
+        if self.verbose:
+            print(message)
 
     def db_connect(self):
-        conn = sqlite3.connect('backup.db')
+        conn = sqlite3.connect('pybackup.db')
         c = conn.cursor()
         sql = 'create table if not exists files (file text, MD5 text)'
         c.execute(sql)
@@ -44,8 +49,8 @@ class PyBackup:
         removed = []
         self.c.execute('SELECT file FROM files;')
         for result in self.c.fetchall():
-            if os.path.isfile(result[0]) is False:
-                print '%s is no longer present. Removing from database and backups' % (result[0])
+            if not os.path.isfile(result[0]):
+                self._log('%s is no longer present. Removing from database and backups' % (result[0]))
                 delete_query = "DELETE from files where file = '{}'".format(result[0])
                 self.c.execute(delete_query)
                 self.conn.commit()
@@ -74,30 +79,34 @@ class PyBackup:
                         self.c.execute('UPDATE files SET MD5 = ? WHERE file = ?', (file_hash, file))
                         self.conn.commit()
                         changes.append(file)
-                        print 'Detected change in %s. New hash: %s' % (file, file_hash)
+                        self._log('Detected change in %s. New hash: %s' % (file, file_hash))
                     elif file_hash in results:
-                        print '{} matches the database'.format(file)
+                        self._log('{} matches the database'.format(file))
                         matches.append(file)
             else:
                 self.c.execute('INSERT INTO files VALUES (?,?)', (file, file_hash))
                 self.conn.commit()
                 additions.append(file)
-                print "{} wasn't in inventory. Added to upload list.".format(file)
+                self._log("{} wasn't in inventory. Added to upload list.".format(file))
         removed = self.cleanup()
         uploads = additions + changes
         for file in uploads:
             f = open(file, 'rb')
-            upload = self.s3pool.upload(file, f, self.bucket)
+            try:
+                upload = self.s3pool.upload(file, f, self.bucket)
+            except HTTPError as e:
+                return 'Error! Unable to upload file. Status code: {}, Error message: {}. Check credentials?'.format(
+                    e.status_code, e.message)
         if len(uploads) > 0:
             while True:
                 if not upload.done():
-                    print "Uploading isn't complete yet. Please wait..."
+                    self._log("Uploading isn't complete yet. Please wait...")
                     time.sleep(5)
                 else:
-                    print 'Upload Complete!'
+                    self._log('Upload Complete!')
                     break
-        print '\nChanges: {}\nMatches: {}\nAdditions: {}\nRemoved: {}'.format(len(changes), len(matches),
-                                                                              len(additions), len(removed))
+        self._log('\nChanges: {}\nMatches: {}\nAdditions: {}\nRemoved: {}'.format(len(changes), len(matches),
+                                                                              len(additions), len(removed)))
         return 'Backup Complete'
 
     def restore(self, files_to_restore):
@@ -111,7 +120,7 @@ class PyBackup:
             self.s3pool.all_completed(requests)
         for file in self.s3pool.as_completed(requests):
             file_to_restore = self.restore_directory + '/' + urllib.unquote(file.url.split('/')[-1:][0])
-            print "Writing File: {}".format(file_to_restore)
+            self._log('Writing File: {}'.format(file_to_restore))
             with open(file_to_restore, 'w') as f:
                 f.write(file.content)
                 f.close()
