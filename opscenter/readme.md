@@ -7,4 +7,4 @@ A Python interface for interacting with the OpsCenter Rest API
 - Requests
 
 ## Usage
-For example usage, look at create_opscenter_users.py in this directory
+For example usage, look at `create_opscenter_users.py` in this directory
