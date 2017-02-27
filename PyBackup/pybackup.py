@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import hashlib
 import os
-import requests
 import sqlite3
 import time
 import tinys3
